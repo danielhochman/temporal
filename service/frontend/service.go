@@ -25,7 +25,11 @@
 package frontend
 
 import (
+	"go.temporal.io/server/common/log/tag"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"math"
+	"net/http"
 	"os"
 	"sync/atomic"
 	"time"
@@ -38,7 +42,6 @@ import (
 	"go.temporal.io/server/api/adminservice/v1"
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/dynamicconfig"
-	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/membership"
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/namespace"
@@ -234,9 +237,14 @@ func (s *Service) Start() {
 	s.versionChecker.Start()
 
 	listener := s.GetGRPCListener()
-	logger.Info("Starting to serve on frontend listener")
-	if err := s.server.Serve(listener); err != nil {
-		logger.Fatal("Failed to serve on frontend listener", tag.Error(err))
+
+	srv := &http.Server{
+		Handler: h2c.NewHandler(http.HandlerFunc(s.server.ServeHTTP), &http2.Server{}),
+	}
+
+	logger.Info("HAX: Starting to serve on frontend listener")
+	if err := srv.Serve(listener); err != nil {
+		logger.Fatal("HAX: Failed to serve on frontend listener", tag.Error(err))
 	}
 }
 
